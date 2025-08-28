@@ -1,55 +1,71 @@
-import streamlit as st
+# app.py
 import sys
 import traceback
 
-# Debe ser la PRIMERA llamada a Streamlit en el archivo
-st.set_page_config(page_title="Convertidor °C → °F", page_icon="🌡", layout="centered")
+# Intentamos importar streamlit y si falla mostramos el error en la salida estándar
+try:
+    import streamlit as st
+except Exception as e:
+    print("ERROR: no se pudo importar streamlit.", file=sys.stderr)
+    traceback.print_exc()
+    raise
 
-def c_to_f(celsius: float) -> float:
-    """Convierte Celsius a Fahrenheit."""
-    return (celsius * 9.0 / 5.0) + 32.0
+# --- Funciones de conversión ---
+def celsius_a_fahrenheit(c: float) -> float:
+    return c * 9.0 / 5.0 + 32.0
 
+def fahrenheit_a_celsius(f: float) -> float:
+    return (f - 32.0) * 5.0 / 9.0
+
+# --- Interfaz principal dentro de una función (para atrapar errores en tiempo de ejecución) ---
 def main():
-    st.title("🌡 Convertidor de Celsius → Fahrenheit")
-    st.write("Fórmula: °F = (°C × 9/5) + 32")
+    # set_page_config debe ser la primera llamada a st.* de la UI
+    st.set_page_config(page_title="Conversor °C ↔ °F", page_icon="🌡", layout="centered")
 
-    # inicializar estado de sesión
-    if "historial" not in st.session_state:
-        st.session_state.historial = []
+    try:
+        st.title("Conversor de temperaturas — Celsius ↔ Fahrenheit")
+        st.write("Convierte valores entre Celsius y Fahrenheit. La app está pensada para ser robusta y fácil de desplegar.")
 
-    # Inputs siempre visibles (evita que la interfaz "desaparezca")
-    celsius = st.number_input("Temperatura (°C)", value=0.0, step=0.1, format="%.2f")
-    decimales = st.slider("Decimales a mostrar", min_value=0, max_value=6, value=2)
+        modo = st.radio("Modo de conversión", ("Celsius → Fahrenheit", "Fahrenheit → Celsius"))
 
-    # Botón de conversión (no usamos st.form para reducir potenciales confusiones)
-    if st.button("Convertir"):
-        try:
-            fahrenheit = c_to_f(celsius)
-            st.session_state.historial.append((celsius, fahrenheit))
-            st.success(f"{celsius:.{decimales}f} °C = {fahrenheit:.{decimales}f} °F")
-        except Exception:
-            st.error("Ocurrió un error durante la conversión.")
-            st.exception(traceback.format_exc())
+        # controles y resultado en dos columnas
+        col_input, col_result = st.columns([2, 1])
 
-    # Mostrar resultado más destacado (si hay historial, mostrar último)
-    if st.session_state.historial:
-        ult_c, ult_f = st.session_state.historial[-1]
-        st.metric(label="Último resultado (°F)", value=f"{ult_f:.{decimales}f}")
+        with col_input:
+            if modo == "Celsius → Fahrenheit":
+                c = st.number_input("Temperatura (°C)", value=0.0, step=0.1, format="%.2f", key="c_input")
+                decimales = st.slider("Decimales a mostrar", 0, 6, 2)
+                # conversión reactiva (también puedes usar un botón si prefieres)
+                f = celsius_a_fahrenheit(c)
+                resultado_text = f"{f:.{decimales}f} °F"
+            else:
+                f = st.number_input("Temperatura (°F)", value=32.0, step=0.1, format="%.2f", key="f_input")
+                decimales = st.slider("Decimales a mostrar", 0, 6, 2)
+                c = fahrenheit_a_celsius(f)
+                resultado_text = f"{c:.{decimales}f} °C"
 
-    # Historial
-    if st.session_state.historial:
-        st.subheader("Historial de conversiones")
-        rows = [{"°C": round(c, decimales), "°F": round(f, decimales)} for c, f in st.session_state.historial]
-        st.table(rows)
+        with col_result:
+            st.metric(label="Resultado", value=resultado_text)
 
-        if st.button("Borrar historial"):
-            st.session_state.historial = []
-            st.experimental_rerun()
+        st.markdown("---")
+        with st.expander("Ejemplos y equivalencias"):
+            st.write("-40 °C → -40 °F (igual en ambos sistemas)")
+            st.write("0 °C → 32 °F (congelación del agua)")
+            st.write("100 °C → 212 °F (ebullición del agua)")
 
-    # Panel de diagnóstico (oculto por defecto)
-    with st.expander("Diagnóstico (oculto)"):
-        st.write(f"Python: {sys.version.splitlines()[0]}")
-        st.write(f"Streamlit: {st._version_}")
+        with st.expander("Información técnica / Depuración"):
+            st.write("Versión de Streamlit detectada:", st._version_)
+            st.write("Si la aplicación aparece en blanco, revisa la sección 'Lista de comprobaciones' abajo.")
+            st.write("Valores actuales (útiles para depurar):")
+            st.json({"modo": modo, "c": locals().get("c", None), "f": locals().get("f", None), "decimales": decimales})
+
+        st.caption("Hecho con ❤ — asegúrate de que el archivo se llame app.py y no streamlit.py")
+
+    except Exception:
+        st.error("Se produjo un error en la ejecución de la app. Revisa el traceback en la salida abajo:")
+        st.text(traceback.format_exc())
+        # re-lanzamos por si quieres ver el log en la terminal/Cloud
+        raise
 
 if _name_ == "_main_":
     main()
